@@ -166,18 +166,28 @@ pip install fal-client  # optional, for --fast mode
 - `FAL_KEY` - Required for fast image gen (Flux.1 Schnell)
 - `XAI_API_KEY` - Required for Grok image gen
 - `GITHUB_PAT` - Required for GitHub Pages publishing
+- `GITHUB_OWNER` - Your GitHub username (default: reads from git config)
+- `GITHUB_REPO` - Your GitHub Pages repo name (default: `menus`)
 
 ## Publishing to GitHub Pages
 
-Menus are auto-published when built via the Telegram bot (menuvision_run.sh passes `--publish`).
+### Setup (one-time)
+1. Create a GitHub repo for your menus (e.g. `your-username/menus`)
+2. Enable GitHub Pages on the `main` branch
+3. Set environment variables:
+```bash
+export GITHUB_PAT="your-personal-access-token"
+export GITHUB_OWNER="your-username"    # optional if git config is set
+export GITHUB_REPO="menus"             # optional, defaults to "menus"
+```
 
-Manual publish:
+### Publish a menu
 ```bash
 python publish_menu.py Restaurant_Menu.html --name "Restaurant" --tagline "Cuisine · City" --cuisine Type
 ```
 
-Gallery: https://ademczuk.github.io/menus/
-Individual menus: https://ademczuk.github.io/menus/Restaurant_Menu.html
+Your gallery: `https://<your-username>.github.io/<repo>/`
+Individual menus: `https://<your-username>.github.io/<repo>/Restaurant_Menu.html`
 
 ## Serving (local preview)
 ```bash
