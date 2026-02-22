@@ -225,6 +225,80 @@ def build_food_prompt(name: str, description: str, cuisine: str = "") -> str:
 
 ---
 
+## IMAGE GENERATION API CALLS
+
+### Quality Mode — Gemini 2.5 Flash Image
+
+```python
+import io
+from PIL import Image
+from google import genai
+
+client = genai.Client()  # uses GOOGLE_API_KEY env var
+
+def generate_gemini(client, name, description, output_path, cuisine=""):
+    prompt = build_food_prompt(name, description, cuisine)
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-image",       # NOT gemini-2.5-flash (that's text-only)
+        contents=prompt,
+        config=genai.types.GenerateContentConfig(
+            response_modalities=["TEXT", "IMAGE"],  # critical — requests image output
+        ),
+    )
+
+    # Extract generated image from response parts
+    for part in response.candidates[0].content.parts:
+        if part.inline_data is not None:
+            img = Image.open(io.BytesIO(part.inline_data.data)).convert("RGB")
+            # Center-crop to square, resize to 800x800
+            w, h = img.size
+            side = min(w, h)
+            left = (w - side) // 2
+            top = (h - side) // 2
+            img = img.crop((left, top, left + side, top + side))
+            img = img.resize((800, 800), Image.LANCZOS)
+            img.save(str(output_path), "JPEG", quality=82)
+            return
+    raise RuntimeError("No image in Gemini response")
+```
+
+### Fast Mode — Flux.1 Schnell via fal.ai
+
+```python
+import fal_client   # uses FAL_KEY env var
+import requests
+
+def generate_flux(name, description, output_path, cuisine=""):
+    prompt = build_food_prompt(name, description, cuisine)
+
+    result = fal_client.subscribe(
+        "fal-ai/flux/schnell",                # model ID
+        arguments={
+            "prompt": prompt,
+            "image_size": {"width": 1024, "height": 1024},
+            "num_inference_steps": 4,          # Schnell uses 4 steps
+            "num_images": 1,
+        },
+    )
+
+    # Download generated image from URL
+    image_url = result["images"][0]["url"]
+    resp = requests.get(image_url, timeout=30)
+    resp.raise_for_status()
+    img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+    img = img.resize((800, 800), Image.LANCZOS)
+    img.save(str(output_path), "JPEG", quality=82)
+```
+
+### Parallel execution (fast mode)
+Flux.1 supports parallel generation — use `concurrent.futures.ThreadPoolExecutor(max_workers=5)` to generate images in parallel. Gemini is sequential (rate-limited).
+
+### Skip drinks
+Only generate images for `category == "food"` sections. Drinks get a text-only list in the HTML output.
+
+---
+
 ## MULTILINGUAL / CJK HANDLING
 
 Menus can be in ANY language. The pipeline handles this through bilingual fields and smart prompt routing.
@@ -292,6 +366,21 @@ def find_image(code, images_dir):
 ```
 {RestaurantName}_Menu.html    # self-contained, all images base64-encoded inline
 ```
+
+### Base64 embedding (build step)
+The build script finds each image file via `find_image()`, then base64-encodes it inline:
+```python
+import base64
+
+def embed_image(image_path):
+    """Read image file → data URI for inline HTML."""
+    data = Path(image_path).read_bytes()
+    b64 = base64.b64encode(data).decode()
+    return f"data:image/jpeg;base64,{b64}"
+
+# Used in HTML template: <img src="{embed_image(path)}" />
+```
+This makes the final HTML completely self-contained — no external image files needed.
 
 ---
 
