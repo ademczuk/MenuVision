@@ -20,6 +20,7 @@ menu_data_*.json
 # Databases & logs
 *.db
 *.log
+delegation-log.txt
 
 # PDFs
 *.pdf
