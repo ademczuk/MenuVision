@@ -1,9 +1,10 @@
 ---
 name: menuvision
 description: "Build beautiful HTML photo menus from restaurant URLs, PDFs, or photos using Gemini Vision and AI image generation"
+version: 1.0.0
 emoji: "🍽️"
 user-invocable: true
-metadata: {"openclaw": {"version": "1.0.0", "triggers": ["menu", "menuvision", "restaurant", "build menu", "photo menu", "digital menu", "menu from PDF", "menu from photos"], "requires": {"bins": ["python3"]}}}
+metadata: {"clawdbot": {"requires": {"env": ["GOOGLE_API_KEY"], "bins": ["python3"]}, "primaryEnv": "GOOGLE_API_KEY", "homepage": "https://github.com/ademczuk/MenuVision"}}
 ---
 
 # MenuVision - Restaurant Menu Builder
@@ -634,6 +635,26 @@ python publish_menu.py Restaurant_Menu.html --name "Restaurant" --tagline "Cuisi
 ```
 
 Gallery: `https://<your-username>.github.io/<repo>/`
+
+## EXTERNAL ENDPOINTS
+
+| Endpoint | Data Sent | Purpose |
+|----------|-----------|---------|
+| `generativelanguage.googleapis.com` | Menu text, page screenshots, PDF page images, food photo prompts | Gemini API for extraction (JSON mode) and image generation |
+| Target restaurant URL | HTTP GET only | Fetching the menu page HTML for extraction |
+| `api.github.com` | Generated HTML file, image files | Publishing menu to GitHub Pages (optional, requires `GITHUB_PAT`) |
+| `fonts.googleapis.com` | None (CSS link in HTML output) | Google Fonts loaded client-side when menu HTML is opened in browser |
+
+No analytics, telemetry, or tracking. No data is sent to any endpoint beyond those listed above.
+
+## SECURITY & PRIVACY
+
+- **API keys**: `GOOGLE_API_KEY` is read from environment variables, never hardcoded or logged
+- **GitHub PAT**: Used only for authenticated pushes to the user's own repo; never transmitted elsewhere
+- **Restaurant data**: Menu content is sent to the Gemini API for processing. No data is stored server-side beyond Google's standard API retention
+- **Generated images**: Stored locally in `images/` directory. When published, uploaded only to the user's own GitHub Pages repo
+- **No telemetry**: The pipeline collects no analytics, metrics, or usage data
+- **Local-first**: All processing happens locally except Gemini API calls. The HTML output and images remain on the user's machine unless they explicitly publish
 
 ## KNOWN LIMITATIONS
 - Tabbed Wix menus: Only first visible tab extracted

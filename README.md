@@ -4,7 +4,7 @@ Build beautiful HTML photo menus for any restaurant from URLs, PDFs, or photos. 
 
 ## What is this?
 
-MenuVision is an **OpenClaw / Claude Code skill** — a build specification that AI coding assistants use to create restaurant menus end-to-end. The skill file contains the full data contract, extraction prompts, and pipeline architecture so the AI agent can generate working code from scratch.
+MenuVision is an **OpenClaw / Claude Code skill** — a build specification that AI coding assistants use to create restaurant menus end-to-end. The skill file contains the full data contract, extraction prompts, and pipeline architecture so the AI agent can generate working code from scratch. Available on [ClawHub](https://clawhub.ai).
 
 1. **Extract** menu data from a website URL, PDF, or photo → structured JSON (Gemini Vision)
 2. **Generate** food photos using AI (Gemini Image)
@@ -69,6 +69,14 @@ The core of this repo is [`.claude/skills/menu-builder.md`](.claude/skills/menu-
 | Per image (Gemini) | $0.039 |
 | 80-item menu | ~$3.12 |
 | Time (80 items) | ~8 min |
+
+## Security & Privacy
+
+- Only external API used is Google Gemini (for extraction and image generation)
+- No telemetry, analytics, or tracking
+- API keys are read from environment variables, never hardcoded
+- All processing is local except Gemini API calls
+- See the [skill file](.claude/skills/menu-builder.md#external-endpoints) for the full endpoint list
 
 ## License
 
