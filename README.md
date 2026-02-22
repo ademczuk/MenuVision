@@ -1,31 +1,57 @@
 # MenuVision
 
-Build beautiful, self-contained HTML photo menus for any restaurant from URLs, PDFs, or photos. See the food before you order.
+Build beautiful, self-contained HTML photo menus for any restaurant from URLs, PDFs, or photos. Works with menus in any language.
 
 ## What is this?
 
-MenuVision is an **OpenClaw skill** — a structured prompt that AI coding assistants (Claude Code, etc.) can use to build restaurant menus end-to-end. The skill file describes the full pipeline:
+MenuVision is an **OpenClaw / Claude Code skill** — a build specification that AI coding assistants use to create restaurant menus end-to-end. The skill file contains the full data contract, extraction prompts, and pipeline architecture so the AI agent can generate working code from scratch.
 
-1. **Extract** menu data from a website URL, PDF, or photo using Gemini Vision
+1. **Extract** menu data from a website URL, PDF, or photo → structured JSON (Gemini Vision)
 2. **Generate** food photos using AI (Gemini Image or Flux.1 Schnell)
 3. **Build** a self-contained HTML menu with Instagram-style grid, tap-to-select, and receipt view
 
-## Quick Start
+## How to Use
 
-1. Clone this repo
-2. Copy `.env.example` to `.env` and fill in your API keys
-3. Point your AI coding assistant at `.claude/skills/menu-builder.md`
-4. Ask it to build a menu for any restaurant
+### Method 1: Claude Code (automatic — recommended)
 
-## Skill File
+```bash
+git clone https://github.com/ademczuk/MenuVision.git
+cd MenuVision
+cp .env.example .env   # fill in your API keys
+```
 
-The core of this repo is [`.claude/skills/menu-builder.md`](.claude/skills/menu-builder.md) — a comprehensive guide covering:
+Open the project in Claude Code. The skill is auto-discovered from `.claude/skills/`. Just ask:
 
-- Pipeline architecture (extract → generate images → build HTML)
-- Multiple image generation backends with cost comparison
-- HTML output features (responsive grid, selection system, allergen legend)
-- Branding customization options
-- GitHub Pages publishing setup
+- "Build a menu for https://www.shoyu.at/menus"
+- "Create a photo menu from this PDF" (attach file)
+- "Make a digital menu from these photos"
+
+### Method 2: Any AI coding assistant
+
+Copy `.claude/skills/menu-builder.md` into your project and reference it in your prompt. The file contains everything the AI needs: JSON schema, extraction prompt, image prompt template, API config, and multilingual handling.
+
+### Method 3: OpenClaw Telegram bot
+
+Deploy the skill to your OpenClaw gateway container:
+
+```bash
+cp .claude/skills/menu-builder.md /path/to/openclaw/workspace/skills/menuvision/SKILL.md
+```
+
+The skill activates on triggers: "menu", "menuvision", "restaurant", "build menu", "photo menu".
+
+## What's in the Skill File
+
+The core of this repo is [`.claude/skills/menu-builder.md`](.claude/skills/menu-builder.md) — a complete build specification containing:
+
+- **JSON data contract** — the exact schema all pipeline stages share (breaks if deviated from)
+- **Extraction prompt** — 12-rule Gemini prompt that defines schema + extraction behavior
+- **Gemini API config** — model name, JSON mode, 64K token limit, truncation detection
+- **Image prompt template** — `build_food_prompt()` for casual phone-photo aesthetic
+- **Multilingual/CJK handling** — bilingual fields, Unicode detection, Latin-script prompt routing
+- **File naming conventions** — `images/{stem}/{code}.jpg` pattern + case-insensitive fallback
+- **HTML output spec** — responsive grid, selection system, allergen legend, branding
+- **Cost breakdown** — per-image and per-menu pricing for both generation backends
 
 ## Environment Variables
 
@@ -33,7 +59,6 @@ The core of this repo is [`.claude/skills/menu-builder.md`](.claude/skills/menu-
 |----------|-------------|
 | `GOOGLE_API_KEY` | Menu extraction + quality image gen (Gemini) |
 | `FAL_KEY` | Fast image gen (Flux.1 Schnell via fal.ai) |
-| `XAI_API_KEY` | Grok image gen (xAI) |
 | `GITHUB_PAT` | Publishing to GitHub Pages |
 | `GITHUB_OWNER` | Your GitHub username |
 | `GITHUB_REPO` | Your GitHub Pages repo (default: `menus`) |
