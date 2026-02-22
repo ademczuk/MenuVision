@@ -8,7 +8,7 @@ metadata: {"openclaw": {"version": "1.0.0", "triggers": ["menu", "menuvision", "
 
 # MenuVision - Restaurant Menu Builder
 
-Build a self-contained HTML photo menu for any restaurant from URLs, PDFs, or photos.
+Build a beautiful HTML photo menu for any restaurant from URLs, PDFs, or photos.
 
 ## When to Use
 
@@ -19,7 +19,7 @@ When the user wants to create a digital menu for a restaurant. Triggers: "build 
 ```
 1. Extract:  URL/PDF/photo  →  menu_data.json     (Gemini Vision)
 2. Generate: menu_data.json →  images/*.jpg        (Gemini Image)
-3. Build:    menu_data.json + images → Menu.html   (self-contained HTML)
+3. Build:    menu_data.json + images → Menu.html   (CSS/JS inline, images relative)
 ```
 
 ### Example usage (ask the AI):
@@ -35,7 +35,7 @@ The AI agent creates these scripts:
 |--------|---------|
 | `extract_menu.py` | Extract menu data from URL/PDF/photo → structured JSON |
 | `generate_images.py` | Generate food photos via Gemini Image |
-| `build_menu.py` | Build self-contained HTML menu from JSON + images |
+| `build_menu.py` | Build HTML menu from JSON + images (CSS/JS inline, images as relative paths) |
 | `publish_menu.py` | (Optional) Publish HTML to GitHub Pages |
 
 ---
@@ -178,14 +178,36 @@ CRITICAL RULES:
 Return ONLY valid JSON. No markdown fences, no explanatory text.
 ```
 
+### Vision Prompt Variant
+For image-based inputs (screenshots, PDF pages, photos), prepend a context line before the base prompt:
+
+```python
+EXTRACTION_PROMPT_VISION = (
+    "You are a restaurant menu data extractor. "
+    "This is a photo/scan of a restaurant menu page.\n\n"
+    "Return this exact JSON structure:"
+    + EXTRACTION_PROMPT.split("Return this exact JSON structure:")[1]
+)
+```
+
+Then each input type adds its own prefix:
+
+| Input Type | Prefix prepended to `EXTRACTION_PROMPT_VISION` |
+|---|---|
+| Screenshot | `"This is a screenshot of a restaurant menu webpage at {url}. Extract ALL visible menu items.\n\n"` |
+| PDF page | `"This is page {n} of a restaurant menu PDF. Extract ALL menu items from this page.\n\n"` |
+| Photo | `"This is a photograph of a restaurant menu. Extract ALL visible menu items.\n\n"` |
+| Text (static HTML) | Use `EXTRACTION_PROMPT` directly (no vision variant needed) |
+
 ---
 
 ## GEMINI API CONFIGURATION
 
 ```python
+import os
 from google import genai
 
-client = genai.Client()  # uses GOOGLE_API_KEY env var
+client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
 def gemini_config():
     return genai.types.GenerateContentConfig(
@@ -238,11 +260,11 @@ def build_food_prompt(name: str, description: str, cuisine: str = "") -> str:
 ### Gemini 2.5 Flash Image
 
 ```python
-import io
+import os, io
 from PIL import Image
 from google import genai
 
-client = genai.Client()  # uses GOOGLE_API_KEY env var
+client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
 def generate_gemini(client, name, description, output_path, cuisine=""):
     prompt = build_food_prompt(name, description, cuisine)
@@ -316,6 +338,15 @@ def prepare_for_image_gen(name, name_secondary, description):
 
 ## FILE NAMING CONVENTIONS
 
+### Auto-derivation
+All filenames are derived from the restaurant name or source URL:
+```python
+stem = "shoyu"  # derived from URL domain, PDF filename, or restaurant name
+data_file = f"menu_data_{stem}.json"
+images_dir = Path(f"images/{stem}")
+html_file = f"{restaurant_name}_Menu.html"  # e.g. "Shoyu_Menu.html"
+```
+
 ### Image files
 ```
 images/{restaurant_stem}/{code}.jpg
@@ -325,39 +356,149 @@ images/{restaurant_stem}/{code}.jpg
 ```
 
 ### Image path matching (in build step)
+Returns POSIX-style string paths with `./` prefix for cross-platform HTML compatibility:
 ```python
-def find_image(code, images_dir):
-    # 1. Exact match: {code}.jpg, .jpeg, .webp, .png
+def find_image(code: str, images_dir: Path):
+    """Return relative POSIX path string to image, or None."""
+    if not images_dir.is_dir():
+        return None
+    rel = images_dir.as_posix()
+    if not rel.startswith("./"):
+        rel = "./" + rel
+    # 1. Exact match
     for ext in ("jpg", "jpeg", "webp", "png"):
         candidate = images_dir / f"{code}.{ext}"
         if candidate.exists():
-            return candidate
+            return f"{rel}/{code}.{ext}"
     # 2. Case-insensitive fallback
     for f in images_dir.iterdir():
         if f.stem.lower() == code.lower() and f.suffix.lower() in (".jpg", ".jpeg", ".webp", ".png"):
-            return f
+            return f"{rel}/{f.name}"
     return None
 ```
 
 ### Output HTML
 ```
-{RestaurantName}_Menu.html    # self-contained, all images base64-encoded inline
+{RestaurantName}_Menu.html    # CSS/JS inline, images as relative file paths
 ```
 
-### Base64 embedding (build step)
-The build script finds each image file via `find_image()`, then base64-encodes it inline:
+### Image rendering (build step)
+The build script uses `find_image()` to resolve each food item's photo, falling back to a gradient SVG placeholder when no image exists:
+
 ```python
 import base64
+import html as html_mod
 
-def embed_image(image_path):
-    """Read image file → data URI for inline HTML."""
-    data = Path(image_path).read_bytes()
-    b64 = base64.b64encode(data).decode()
-    return f"data:image/jpeg;base64,{b64}"
+GRADIENT_COLORS = [
+    ("#c41e3a", "#8b0000"), ("#ff6b6b", "#ee5a24"), ("#fdcb6e", "#e17055"),
+    ("#00b894", "#00cec9"), ("#6c5ce7", "#a29bfe"), ("#e17055", "#d63031"),
+    ("#00cec9", "#0984e3"), ("#fab1a0", "#e17055"), ("#e8a87c", "#d4956b"),
+    ("#fd79a8", "#e84393"),
+]
 
-# Used in HTML template: <img src="{embed_image(path)}" />
+def make_placeholder_svg(code: str, name: str, secondary: str = "") -> str:
+    """Generate a base64-encoded SVG placeholder when no image exists."""
+    idx = hash(code) % len(GRADIENT_COLORS)
+    c1, c2 = GRADIENT_COLORS[idx]
+    display = html_mod.escape(secondary[:12] if secondary else name[:12])
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="220" height="180" viewBox="0 0 220 180">
+  <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:{c1}"/>
+    <stop offset="100%" style="stop-color:{c2}"/>
+  </linearGradient></defs>
+  <rect width="220" height="180" fill="url(#g)" rx="12"/>
+  <text x="110" y="75" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-size="56" font-family="serif">{html_mod.escape(code)}</text>
+  <text x="110" y="120" text-anchor="middle" fill="white" font-size="26" font-family="serif" opacity="0.9">{display}</text>
+  <text x="110" y="148" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" font-family="sans-serif">{html_mod.escape(name[:30])}</text>
+</svg>'''
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{b64}"
+
+
+def image_tag(code: str, name: str, secondary: str, images_dir: Path) -> str:
+    """Return <img> tag — real image with lazy-load OR gradient SVG placeholder."""
+    real = find_image(code, images_dir)
+    if real:
+        return f'<img src="{html_mod.escape(real)}" alt="{html_mod.escape(name)}" loading="lazy">'
+    else:
+        src = make_placeholder_svg(code, name, secondary)
+        return f'<img src="{src}" alt="{html_mod.escape(name)}">'
 ```
-This makes the final HTML completely self-contained — no external image files needed.
+
+**Note:** The HTML references images via relative paths (`./images/shoyu/M1.jpg`). The HTML file and `images/` directory must be deployed together. Only CSS, JS, and SVG placeholders are inline — real food photos are external files.
+
+---
+
+## ROBUSTNESS PATTERNS
+
+### Retry Logic
+All Gemini API calls should retry on transient failures:
+```python
+import time
+
+def call_with_retry(fn, *args, max_retries=3, **kwargs):
+    """Retry API calls with exponential backoff."""
+    for attempt in range(max_retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            wait = 2 ** attempt
+            print(f"  Retry {attempt + 1}/{max_retries} in {wait}s: {e}")
+            time.sleep(wait)
+```
+
+### JSON Response Parsing
+Gemini sometimes wraps JSON in markdown fences or produces trailing commas. Parse defensively:
+```python
+import re, json
+
+def parse_gemini_json(raw: str) -> dict:
+    """Parse JSON from Gemini, handling markdown fences and quirks."""
+    text = raw.strip()
+    # Strip markdown code fences
+    if text.startswith("```"):
+        text = re.sub(r"^```\w*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
+    # Fix trailing commas before } or ]
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Try to extract JSON object from surrounding text
+        match = re.search(r"\{[\s\S]*\}", text)
+        if match:
+            return json.loads(match.group())
+        raise
+```
+
+### Post-Processing
+After extraction, run these cleanups:
+```python
+def generate_codes(data: dict) -> dict:
+    """Ensure every item has a unique code. Generates sequential codes per section
+    if items have empty/missing codes (e.g. A1, A2 for appetizers, M1, M2 for mains)."""
+    # ... assign prefix by section title, increment counter per section
+    return data
+
+def normalize_prices(data: dict) -> dict:
+    """Normalize price formats: numeric → string, strip currency symbols,
+    preserve comma/period format as-is."""
+    # ... convert float/int to string, strip €/$, etc.
+    return data
+```
+
+### CURRENCY_MAP
+Maps ISO currency codes to display symbols for the HTML output:
+```python
+CURRENCY_MAP = {
+    "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF ",
+    "JPY": "¥", "CNY": "¥", "INR": "₹", "AUD": "A$",
+    "CAD": "C$", "SEK": "kr ", "NOK": "kr ", "DKK": "kr ",
+    "THB": "฿", "KRW": "₩", "HKD": "HK$", "SGD": "S$",
+}
+```
 
 ---
 
@@ -367,9 +508,11 @@ This makes the final HTML completely self-contained — no external image files 
 1. Fetch page with `requests`
 2. Check text density to detect static vs JS-rendered:
    `density = len(soup.get_text(strip=True)) / len(raw_html)`
-3. **Static** (density >= 0.02): Clean HTML, send text to Gemini 2.5 Flash (JSON mode)
-4. **JS-rendered** (density < 0.02, e.g. Wix, Framer): Screenshot with Playwright, send to Gemini Vision
-5. **Large menus** (>12k chars text): Chunked extraction, merge like PDF multi-page (deduplicate by code)
+3. **Density override**: If 5+ price patterns found (`r"[$€£¥₹CHF]\s*\d+[.,]\d{2}|\d+[.,]\d{2}\s*[$€£¥₹]"`), force density to 1.0 (treat as static)
+4. **Static** (density >= 0.02): Clean HTML, send text to Gemini 2.5 Flash (JSON mode)
+5. **JS-rendered** (density < 0.02, e.g. Wix, Framer): Screenshot with Playwright, send to Gemini Vision
+6. **Screenshot height cap**: If screenshot > 6000px tall, resize proportionally to fit
+7. **Large menus** (>12k chars text): Chunked extraction, merge like PDF multi-page (deduplicate by code)
 
 ### PDF Files
 1. Convert each page to image via PyMuPDF (200 DPI)
@@ -383,13 +526,6 @@ This makes the final HTML completely self-contained — no external image files 
 
 ---
 
-## IMAGE GENERATION
-
-### Gemini 2.5 Flash Image
-- `$0.039/image`, ~6s sequential
-- High quality, realistic casual photos
-- Uses `GOOGLE_API_KEY`
-
 ---
 
 ## HTML OUTPUT FEATURES
@@ -402,7 +538,8 @@ This makes the final HTML completely self-contained — no external image files 
 - Allergen legend
 - **Currency converter** — minimalist button in header (e.g. `€` pill) that cycles or opens a picker for: EUR, USD, AUD, CAD, GBP. Converts all displayed prices client-side using snapshot exchange rates embedded at build time. Updates grid overlays, receipt totals, drink prices, and variant prices. Source currency comes from `metadata.currency`.
 - Fully responsive, dark mode
-- Self-contained (all CSS/JS inline, images base64, only Google Fonts external)
+- All CSS/JS inline, images via relative file paths (`./images/{stem}/{code}.jpg`), only Google Fonts external
+- Gradient SVG placeholders for missing images (inline base64 SVG, not raster)
 
 ### Currency Converter
 
