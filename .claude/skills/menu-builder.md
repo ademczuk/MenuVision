@@ -659,9 +659,9 @@ pip install playwright && playwright install chromium
 ### Setup (one-time)
 1. Create a GitHub repo for your menus (e.g. `your-username/menus`)
 2. Enable GitHub Pages on the `main` branch
-3. Set environment variables:
+3. Set environment variables (must be accessible to the Python process):
 ```bash
-export GITHUB_PAT="your-personal-access-token"
+export GITHUB_PAT="your-personal-access-token"   # Required — used for git push auth
 export GITHUB_OWNER="your-username"
 export GITHUB_REPO="menus"
 ```
