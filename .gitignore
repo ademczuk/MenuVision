@@ -1,20 +1,34 @@
-# Secrets
+# Secrets & config with credentials
 .env
 *.key
 keys.txt
 credentials*
+oc_config_tmp.json
+
+# Archives (may contain hardcoded keys)
+_archive/
 
 # Generated images
 images/
 
 # Generated HTML menus
-*_Menu.html
+*_Menu*.html
 
 # Generated JSON data
 menu_data_*.json
 
-# Claude Code local settings
+# Runtime artifacts
+*.db
+*.log
+*.pdf
+delegation-log.txt
+
+# Local tool data
+.overstory/
+.rag-cache/
 .claude/settings.local.json
+.claude/worktrees/
+data/
 
 # Python
 __pycache__/
