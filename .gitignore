@@ -5,7 +5,7 @@ keys.txt
 credentials*
 oc_config_tmp.json
 
-# Archive (contains hardcoded keys in old scripts)
+# Archive
 _archive/
 
 # Generated images

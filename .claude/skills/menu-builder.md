@@ -81,8 +81,7 @@ All three pipeline stages share this exact JSON schema. The AI agent MUST use th
   },
   "metadata": {
     "languages": ["German", "English"],
-    "currency": "EUR",
-    "price_format": "European comma"
+    "currency": "EUR"
   }
 }
 ```
@@ -91,16 +90,26 @@ All three pipeline stages share this exact JSON schema. The AI agent MUST use th
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `sections[].category` | `"food"` or `"drink"` | Yes | Drives food grid vs drink list layout |
+| `restaurant.name` | string | Yes | Display name in HTML header |
+| `restaurant.cuisine` | string | Yes | Passed to `build_food_prompt()` as cuisine context |
+| `restaurant.tagline` | string | No | Subtitle line in HTML header |
+| `sections[].title` | string | Yes | Section heading in primary language |
+| `sections[].title_secondary` | string | No | Section heading in secondary language |
+| `sections[].category` | `"food"` or `"drink"` | Yes | Drives food grid vs drink list layout. Only `"food"` items get generated images. |
+| `sections[].note` | string | No | Section-level note (e.g. "served with rice", "Mon-Fri 11-15h") |
 | `items[].code` | string | Yes | Unique per item. Links to image filename. Use existing codes (M1, K2) or generate (A1, A2) |
 | `items[].name` | string | Yes | Primary language. For CJK menus, this is the CJK name |
 | `items[].name_secondary` | string | No | Secondary language. For CJK menus, this is the English/Latin name |
+| `items[].description` | string | No | Brief description. Fed to `build_food_prompt()` for image generation |
+| `items[].description_secondary` | string | No | Description in secondary language |
 | `items[].price` | string | Yes | Preserve original format ("12,90" not "12.90") |
 | `items[].price_prefix` | string | No | e.g. "ab" (starting from), "ca." |
 | `items[].variants` | array | No | `[{"label": "6 Stk", "price": "8,90"}, ...]` — set main price to smallest variant |
 | `items[].allergens` | string | No | Space-separated codes exactly as printed: "A C F" |
 | `items[].dietary` | array | No | `["vegan", "vegetarian", "spicy", "gluten-free", "halal", "kosher"]` |
+| `allergen_legend` | object | No | Map of allergen codes to display names: `{"A": "Gluten", ...}` |
 | `metadata.currency` | string | Yes | ISO code: "EUR", "USD", "JPY", "CNY", "THB", etc. |
+| `metadata.languages` | array | No | Languages detected in the menu: `["German", "English"]` |
 
 ---
 
@@ -146,8 +155,7 @@ Return this exact JSON structure:
   },
   "metadata": {
     "languages": ["German", "English"],
-    "currency": "EUR",
-    "price_format": "European comma"
+    "currency": "EUR"
   }
 }
 
@@ -175,7 +183,7 @@ Return ONLY valid JSON. No markdown fences, no explanatory text.
 ## GEMINI API CONFIGURATION
 
 ```python
-import google.genai as genai
+from google import genai
 
 client = genai.Client()  # uses GOOGLE_API_KEY env var
 
@@ -357,10 +365,11 @@ This makes the final HTML completely self-contained — no external image files 
 
 ### HTML URLs
 1. Fetch page with `requests`
-2. Check text density to detect static vs JS-rendered
+2. Check text density to detect static vs JS-rendered:
+   `density = len(soup.get_text(strip=True)) / len(raw_html)`
 3. **Static** (density >= 0.02): Clean HTML, send text to Gemini 2.5 Flash (JSON mode)
-4. **JS-rendered** (Wix, Framer, etc.): Screenshot with Playwright, send to Gemini Vision
-5. **Large menus** (>12k chars): Chunked extraction, merge like PDF multi-page
+4. **JS-rendered** (density < 0.02, e.g. Wix, Framer): Screenshot with Playwright, send to Gemini Vision
+5. **Large menus** (>12k chars text): Chunked extraction, merge like PDF multi-page (deduplicate by code)
 
 ### PDF Files
 1. Convert each page to image via PyMuPDF (200 DPI)
@@ -409,14 +418,18 @@ This makes the final HTML completely self-contained — no external image files 
 | Component | Cost |
 |-----------|------|
 | Extraction (per page) | ~$0.001 |
-| Images (per item) | $0.039 |
-| **80-item restaurant** | **~$3.12** |
-| Time (80 items) | ~8 min |
+| Image generation (per food item) | $0.039 |
+| **80 food items** | **~$3.12** |
+| Time (80 food items) | ~8 min |
+
+Drinks are not image-generated (text-only list), so actual cost depends on food-to-drink ratio.
 
 ## DEPENDENCIES
 
+Requires **Python 3.9+**.
+
 Required:
-- `google-genai` (extraction + quality images)
+- `google-genai` (extraction + image generation)
 - `Pillow` (image processing)
 
 For HTML URLs:
