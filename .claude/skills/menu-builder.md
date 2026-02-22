@@ -37,7 +37,7 @@ The AI agent creates these scripts:
 | `extract_menu.py` | Extract menu data from URL/PDF/photo → structured JSON |
 | `generate_images.py` | Generate food photos via Gemini Image |
 | `build_menu.py` | Build HTML menu from JSON + images (CSS/JS inline, images as relative paths) |
-| `publish.sh` | (Optional) Publish HTML to GitHub Pages — wrapper script, always use this |
+| `publish_menu.py` | (Optional) Publish HTML to GitHub Pages |
 
 ---
 
@@ -667,33 +667,25 @@ export GITHUB_REPO="menus"
 ```
 
 ### Publish
-
-**IMPORTANT: Always use the `publish.sh` wrapper script. Do NOT generate your own git/publish logic.**
-
-The wrapper script handles all NTFS bind mount permission issues, git safe.directory, PAT auth, and gallery updates. Call it with one command:
-
 ```bash
-bash /mnt/host/projects/TanTan_Menu_Package/publish.sh "Restaurant_Menu.html" --name "Restaurant" --tagline "Cuisine · City" --cuisine Type
+python publish_menu.py Restaurant_Menu.html --name "Restaurant" --tagline "Cuisine · City" --cuisine Type
 ```
-
-The script:
-1. Copies HTML + images to the menus repo using `cp` (not `shutil.copy2` — avoids NTFS `chmod` EPERM)
-2. Writes `.meta_` JSON for the gallery
-3. Updates the gallery `index.html`
-4. Runs `git -c safe.directory=* -c core.fileMode=false -c gc.auto=0` for add/commit/push
-5. Authenticates push via `GITHUB_PAT` env var
-6. Prints the public URL on success
 
 Gallery: `https://<your-username>.github.io/<repo>/`
 
-### Why a wrapper (not generated code)
+### How publishing works
 
-Docker containers with NTFS bind-mounted repos hit three issues that make generated publish code fragile:
-- `/home/node` is read-only → `git config --global` fails silently
-- `shutil.copy2()` calls `os.chmod()` → EPERM on NTFS
-- Mixed UID ownership on `.git/objects` → git object creation fails
+`publish_menu.py` clones the menus repo to a **temp directory on native filesystem** (`git clone --depth=1`), copies files there, commits, and pushes. This avoids all NTFS bind mount permission issues that occur when operating directly on mounted volumes in Docker containers.
 
-The wrapper script avoids all three by using `cp`, inline git `-c` flags, and PAT-authenticated push.
+Key implementation details:
+1. `git clone --depth=1` to a `tempfile.mkdtemp()` directory (native FS, proper POSIX permissions)
+2. Copies HTML + images using `shutil.copy()` (not `copy2` — avoids `os.chmod()` EPERM on NTFS)
+3. `find_image_dirs` regex uses `[^/"]+` (not `[a-z_]+`) to match Unicode chars in image dir names
+4. Writes `.meta_` JSON sidecar for gallery metadata
+5. Rebuilds gallery `index.html`
+6. Authenticates push via `GITHUB_PAT` env var embedded in the clone URL
+7. Temp directory is cleaned up after push
+8. `MENUS_REPO_DIR` (bind mount path) is only used for `--list` read-only queries
 
 ## EXTERNAL ENDPOINTS
 
