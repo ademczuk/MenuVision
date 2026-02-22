@@ -451,7 +451,7 @@ def call_with_retry(fn, *args, max_retries=3, **kwargs):
 ```
 
 ### JSON Response Parsing
-Gemini sometimes wraps JSON in markdown fences or produces trailing commas. Parse defensively:
+Gemini sometimes wraps JSON in markdown fences or produces trailing commas. Parse defensively — try raw parse first, apply trailing comma fix only as last resort (unconditional fix can corrupt valid JSON strings containing `,]` patterns):
 ```python
 import re, json
 
@@ -462,16 +462,29 @@ def parse_gemini_json(raw: str) -> dict:
     if text.startswith("```"):
         text = re.sub(r"^```\w*\n?", "", text)
         text = re.sub(r"\n?```$", "", text)
-    # Fix trailing commas before } or ]
-    text = re.sub(r",\s*([}\]])", r"\1", text)
+    text = text.strip()
+    # Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Try to extract JSON object from surrounding text
-        match = re.search(r"\{[\s\S]*\}", text)
-        if match:
-            return json.loads(match.group())
-        raise
+        pass
+    # Try extracting JSON object from surrounding text
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        candidate = match.group(0)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+        # Fix trailing commas and retry
+        candidate = re.sub(r",\s*([\]}])", r"\1", candidate)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+    # Last resort: fix trailing commas on original
+    text = re.sub(r",\s*([\]}])", r"\1", text)
+    return json.loads(text)
 ```
 
 ### Post-Processing
@@ -498,6 +511,7 @@ CURRENCY_MAP = {
     "JPY": "¥", "CNY": "¥", "INR": "₹", "AUD": "A$",
     "CAD": "C$", "SEK": "kr ", "NOK": "kr ", "DKK": "kr ",
     "THB": "฿", "KRW": "₩", "HKD": "HK$", "SGD": "S$",
+    "CZK": "Kč ", "HUF": "Ft ", "PLN": "zł ", "TRY": "₺",
 }
 ```
 
@@ -513,7 +527,7 @@ CURRENCY_MAP = {
 4. **Static** (density >= 0.02): Clean HTML, send text to Gemini 2.5 Flash (JSON mode)
 5. **JS-rendered** (density < 0.02, e.g. Wix, Framer): Screenshot with Playwright, send to Gemini Vision
 6. **Screenshot height cap**: If screenshot > 6000px tall, resize proportionally to fit
-7. **Large menus** (>12k chars text): Chunked extraction, merge like PDF multi-page (deduplicate by code)
+7. **Large menus** (>12k chars text): Chunked extraction, merge like PDF multi-page. Deduplicate by tracking `seen_codes = set()` across chunks — for each item in each chunk's sections, skip if `item["code"]` already in `seen_codes`. Only append sections that still have items after dedup.
 
 ### PDF Files
 1. Convert each page to image via PyMuPDF (200 DPI)
@@ -539,6 +553,9 @@ CURRENCY_MAP = {
 - Fully responsive, dark mode
 - All CSS/JS inline, images via relative file paths (`./images/{stem}/{code}.jpg`), only Google Fonts external
 - Gradient SVG placeholders for missing images (inline base64 SVG, not raster)
+- **CJK font loading** via Google Fonts link tag:
+  `family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700`
+- CSS `font-family` stack: primary font, then `'Noto Sans SC', 'Noto Sans JP', 'Noto Sans KR', sans-serif`
 
 ### Currency Converter
 
@@ -547,22 +564,42 @@ A minimalist currency toggle built into the HTML output. All client-side, no API
 **Implementation:**
 - The build script embeds a `RATES` object with snapshot exchange rates (base: USD) at build time
 - Source currency is read from `metadata.currency` in the JSON data
-- All prices are stored in `data-price` attributes as numeric values in the original currency
+- All prices are stored in `data-price` attributes as **numeric** values (not raw strings like "12,90")
 - A small pill button in the header shows the current currency symbol (e.g. `€`)
 - Tapping opens a mini-picker or cycles through: EUR (`€`), USD (`$`), GBP (`£`), AUD (`A$`), CAD (`C$`)
 - On currency change, JavaScript converts all `data-price` values and updates displayed text
-- Receipt totals and variant prices also update
+- Receipt totals in the Selection tab also convert via `convertPrice()` using `SOURCE_CURRENCY` and `currentCurrency`
+- Variant prices also update
 - Selected currency persists in `localStorage`
+
+**Price parsing helper** (build-time — converts string prices to numeric for `data-price` attributes):
+```python
+import re
+
+def _parse_price_numeric(price: str) -> str:
+    """Parse price string to numeric float for data-price attribute."""
+    matches = re.findall(r"(\d+[.,]\d+)", price)
+    if matches:
+        return str(float(matches[-1].replace(",", ".")))
+    return "0"
+
+# Usage in HTML template:
+# <div class="price" data-price="{_parse_price_numeric(item['price'])}">€12,90</div>
+```
 
 ```javascript
 // Snapshot rates embedded at build time (base: USD)
 const RATES = { EUR: 0.92, USD: 1.00, GBP: 0.79, AUD: 1.54, CAD: 1.36 };
 const SYMBOLS = { EUR: "€", USD: "$", GBP: "£", AUD: "A$", CAD: "C$" };
+const SOURCE_CURRENCY = "EUR";  // from metadata.currency
 
 function convertPrice(amount, fromCurrency, toCurrency) {
     const inUSD = amount / RATES[fromCurrency];
     return inUSD * RATES[toCurrency];
 }
+
+// Applied to: grid overlay prices, drink list prices, variant prices,
+// AND receipt/selection tab totals (all elements with data-price attribute)
 ```
 
 The build script should fetch current rates at build time (or use reasonable defaults if offline). Prices display with 2 decimal places in the target currency, using the target locale's format.
