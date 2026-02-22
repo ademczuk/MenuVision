@@ -15,28 +15,18 @@ The pipeline accepts ANY of these:
 
 ## Quick Start
 
-### Quick mode (placeholders, no image gen):
-```bash
-python openclaw.py quick https://www.shoyu.at/menus --name "Shoyu" --tagline "Japanese Kitchen · Vienna"
+The AI agent follows these steps when asked to build a menu:
+
+```
+1. Extract:  URL/PDF/photo  →  menu_data.json     (Gemini Vision)
+2. Generate: menu_data.json →  images/*.jpg        (Gemini Image or Flux.1)
+3. Build:    menu_data.json + images → Menu.html   (self-contained HTML)
 ```
 
-### Fast mode (Flux.1 Schnell — $0.003/img, ~2s):
-```bash
-export FAL_KEY="your-key"
-python openclaw.py https://www.shoyu.at/menus --name "Shoyu" --tagline "Japanese Kitchen · Vienna" --fast
-```
-
-### Quality mode (Gemini 2.5 Flash Image — $0.039/img, ~6s):
-```bash
-python openclaw.py https://www.shoyu.at/menus --name "Shoyu" --tagline "Japanese Kitchen · Vienna"
-```
-
-### Step by step:
-```bash
-python openclaw.py extract https://www.shoyu.at/menus          # → menu_data_shoyu.json
-python openclaw.py images menu_data_shoyu.json --fast           # → images/shoyu/*.jpg
-python openclaw.py build menu_data_shoyu.json --name "Shoyu"    # → Shoyu_Menu.html
-```
+### Example usage (ask the AI):
+- "Build a menu for https://www.shoyu.at/menus"
+- "Create a photo menu from this PDF" (attach file)
+- "Make a digital menu from these photos of a restaurant menu"
 
 ## Pipeline Architecture
 
@@ -62,14 +52,16 @@ Source (URL/PDF/Photo)
 └─────────────┘
 ```
 
-## File Reference
+## Pipeline Components
 
-| File | Purpose |
-|------|---------|
-| `openclaw.py` | CLI orchestrator (full/quick/step-by-step) |
-| `extract_menu.py` | Unified extractor: URL/PDF/photo → JSON |
-| `generate_images.py` | Food image generator (Gemini or Flux.1) |
-| `build_menu.py` | Parameterized HTML builder |
+The AI agent should create these scripts when building a menu:
+
+| Script | Purpose |
+|--------|---------|
+| `extract_menu.py` | Extract menu data from URL/PDF/photo → structured JSON |
+| `generate_images.py` | Generate food photos via Gemini Image or Flux.1 Schnell |
+| `build_menu.py` | Build self-contained HTML menu from JSON + images |
+| `publish_menu.py` | (Optional) Publish HTML to GitHub Pages |
 
 ## Extraction Details
 

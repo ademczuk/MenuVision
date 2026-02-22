@@ -1,0 +1,37 @@
+# Secrets
+.env
+*.key
+keys.txt
+credentials*
+
+# Generated images
+images/
+
+# Generated HTML menus
+*_Menu.html
+
+# Generated JSON data
+menu_data_*.json
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
