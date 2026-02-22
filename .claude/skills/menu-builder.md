@@ -673,6 +673,28 @@ python publish_menu.py Restaurant_Menu.html --name "Restaurant" --tagline "Cuisi
 
 Gallery: `https://<your-username>.github.io/<repo>/`
 
+### Container Git Safety
+
+When `publish_menu.py` runs inside a Docker container with bind-mounted repos, `/home/node` is read-only — `git config --global` cannot write `~/.gitconfig`. All git commands must use the `-c` flag inline:
+
+```python
+_git_base = ["git", "-c", "safe.directory=*"]
+_git_run = lambda args: subprocess.run(
+    _git_base + args[1:] if args[0] == "git" else args,
+    cwd=str(MENUS_REPO_DIR), capture_output=True, text=True,
+)
+```
+
+**Key rules:**
+- Never use `--global` git config — filesystem may be read-only
+- Check return codes on `git add` and `git status` before proceeding — empty stdout from a failed `git status --porcelain` looks identical to "no changes" and causes false-success
+- Use PAT auth on `git pull --rebase` too, not just push — the container has no credential helper:
+```python
+if push_url:
+    _git_run(["git", "pull", "--rebase", push_url, "main"])
+```
+- `GITHUB_PAT` must be set as an environment variable accessible to the Python process (not just documented — the publish script reads it via `os.environ["GITHUB_PAT"]`)
+
 ## EXTERNAL ENDPOINTS
 
 | Endpoint | Data Sent | Purpose |
