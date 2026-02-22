@@ -1,6 +1,6 @@
 # MenuVision
 
-Build beautiful, self-contained HTML photo menus for any restaurant from URLs, PDFs, or photos. Works with menus in any language.
+Build beautiful HTML photo menus for any restaurant from URLs, PDFs, or photos. Works with menus in any language.
 
 ## What is this?
 
@@ -8,7 +8,7 @@ MenuVision is an **OpenClaw / Claude Code skill** — a build specification that
 
 1. **Extract** menu data from a website URL, PDF, or photo → structured JSON (Gemini Vision)
 2. **Generate** food photos using AI (Gemini Image)
-3. **Build** a self-contained HTML menu with Instagram-style grid, tap-to-select, receipt view, and currency converter
+3. **Build** an HTML menu with Instagram-style grid, tap-to-select, receipt view, and currency converter (CSS/JS inline, images as relative paths)
 
 ## How to Use
 

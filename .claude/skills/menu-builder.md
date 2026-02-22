@@ -526,8 +526,6 @@ CURRENCY_MAP = {
 
 ---
 
----
-
 ## HTML OUTPUT FEATURES
 - 3-column Instagram-style grid (9:16 portrait tiles)
 - Gradient text overlay with name + secondary language + price
