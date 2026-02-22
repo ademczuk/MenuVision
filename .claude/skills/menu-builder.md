@@ -18,7 +18,7 @@ When the user wants to create a digital menu for a restaurant. Triggers: "build 
 
 ```
 1. Extract:  URL/PDF/photo  →  menu_data.json     (Gemini Vision)
-2. Generate: menu_data.json →  images/*.jpg        (Gemini Image or Flux.1)
+2. Generate: menu_data.json →  images/*.jpg        (Gemini Image)
 3. Build:    menu_data.json + images → Menu.html   (self-contained HTML)
 ```
 
@@ -34,7 +34,7 @@ The AI agent creates these scripts:
 | Script | Purpose |
 |--------|---------|
 | `extract_menu.py` | Extract menu data from URL/PDF/photo → structured JSON |
-| `generate_images.py` | Generate food photos via Gemini Image or Flux.1 Schnell |
+| `generate_images.py` | Generate food photos via Gemini Image |
 | `build_menu.py` | Build self-contained HTML menu from JSON + images |
 | `publish_menu.py` | (Optional) Publish HTML to GitHub Pages |
 
@@ -227,7 +227,7 @@ def build_food_prompt(name: str, description: str, cuisine: str = "") -> str:
 
 ## IMAGE GENERATION API CALLS
 
-### Quality Mode — Gemini 2.5 Flash Image
+### Gemini 2.5 Flash Image
 
 ```python
 import io
@@ -262,37 +262,6 @@ def generate_gemini(client, name, description, output_path, cuisine=""):
             return
     raise RuntimeError("No image in Gemini response")
 ```
-
-### Fast Mode — Flux.1 Schnell via fal.ai
-
-```python
-import fal_client   # uses FAL_KEY env var
-import requests
-
-def generate_flux(name, description, output_path, cuisine=""):
-    prompt = build_food_prompt(name, description, cuisine)
-
-    result = fal_client.subscribe(
-        "fal-ai/flux/schnell",                # model ID
-        arguments={
-            "prompt": prompt,
-            "image_size": {"width": 1024, "height": 1024},
-            "num_inference_steps": 4,          # Schnell uses 4 steps
-            "num_images": 1,
-        },
-    )
-
-    # Download generated image from URL
-    image_url = result["images"][0]["url"]
-    resp = requests.get(image_url, timeout=30)
-    resp.raise_for_status()
-    img = Image.open(io.BytesIO(resp.content)).convert("RGB")
-    img = img.resize((800, 800), Image.LANCZOS)
-    img.save(str(output_path), "JPEG", quality=82)
-```
-
-### Parallel execution (fast mode)
-Flux.1 supports parallel generation — use `concurrent.futures.ThreadPoolExecutor(max_workers=5)` to generate images in parallel. Gemini is sequential (rate-limited).
 
 ### Skip drinks
 Only generate images for `category == "food"` sections. Drinks get a text-only list in the HTML output.
@@ -407,15 +376,10 @@ This makes the final HTML completely self-contained — no external image files 
 
 ## IMAGE GENERATION
 
-### Quality Mode (default) — Gemini 2.5 Flash Image
+### Gemini 2.5 Flash Image
 - `$0.039/image`, ~6s sequential
-- Best quality, most realistic
+- High quality, realistic casual photos
 - Uses `GOOGLE_API_KEY`
-
-### Fast Mode — Flux.1 Schnell via fal.ai
-- `$0.003/image` (13x cheaper), ~2s parallel (5 workers)
-- Good quality, slightly less realistic
-- Uses `FAL_KEY`
 
 ---
 
@@ -442,12 +406,12 @@ This makes the final HTML completely self-contained — no external image files 
 
 ## COST SUMMARY
 
-| Component | Quality Mode | Fast Mode |
-|-----------|-------------|-----------|
-| Extraction (per page) | ~$0.001 | ~$0.001 |
-| Images (per item) | $0.039 | $0.003 |
-| **80-item restaurant** | **~$3.12** | **~$0.24** |
-| Time (80 items) | ~8 min | ~90s (5 workers) |
+| Component | Cost |
+|-----------|------|
+| Extraction (per page) | ~$0.001 |
+| Images (per item) | $0.039 |
+| **80-item restaurant** | **~$3.12** |
+| Time (80 items) | ~8 min |
 
 ## DEPENDENCIES
 
@@ -465,18 +429,13 @@ For JS-rendered sites:
 For PDF files:
 - `PyMuPDF` (PDF to image conversion)
 
-For fast image mode:
-- `fal-client` (Flux.1 Schnell API)
-
 ```bash
 pip install google-genai Pillow requests beautifulsoup4 PyMuPDF
 pip install playwright && playwright install chromium
-pip install fal-client  # optional, for --fast mode
 ```
 
 ## ENVIRONMENT VARIABLES
-- `GOOGLE_API_KEY` — Required for extraction and quality image gen
-- `FAL_KEY` — Required for fast image gen (Flux.1 Schnell)
+- `GOOGLE_API_KEY` — Required for extraction and image generation
 - `GITHUB_PAT` — Required for GitHub Pages publishing
 - `GITHUB_OWNER` — Your GitHub username (default: reads from git config)
 - `GITHUB_REPO` — Your GitHub Pages repo name (default: `menus`)
