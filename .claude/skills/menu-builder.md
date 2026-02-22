@@ -400,8 +400,36 @@ This makes the final HTML completely self-contained — no external image files 
 - Category pill navigation with scroll sync
 - Drinks section below grid with currency-prefixed prices
 - Allergen legend
+- **Currency converter** — minimalist button in header (e.g. `€` pill) that cycles or opens a picker for: EUR, USD, AUD, CAD, GBP. Converts all displayed prices client-side using snapshot exchange rates embedded at build time. Updates grid overlays, receipt totals, drink prices, and variant prices. Source currency comes from `metadata.currency`.
 - Fully responsive, dark mode
 - Self-contained (all CSS/JS inline, images base64, only Google Fonts external)
+
+### Currency Converter
+
+A minimalist currency toggle built into the HTML output. All client-side, no API calls at runtime.
+
+**Implementation:**
+- The build script embeds a `RATES` object with snapshot exchange rates (base: USD) at build time
+- Source currency is read from `metadata.currency` in the JSON data
+- All prices are stored in `data-price` attributes as numeric values in the original currency
+- A small pill button in the header shows the current currency symbol (e.g. `€`)
+- Tapping opens a mini-picker or cycles through: EUR (`€`), USD (`$`), GBP (`£`), AUD (`A$`), CAD (`C$`)
+- On currency change, JavaScript converts all `data-price` values and updates displayed text
+- Receipt totals and variant prices also update
+- Selected currency persists in `localStorage`
+
+```javascript
+// Snapshot rates embedded at build time (base: USD)
+const RATES = { EUR: 0.92, USD: 1.00, GBP: 0.79, AUD: 1.54, CAD: 1.36 };
+const SYMBOLS = { EUR: "€", USD: "$", GBP: "£", AUD: "A$", CAD: "C$" };
+
+function convertPrice(amount, fromCurrency, toCurrency) {
+    const inUSD = amount / RATES[fromCurrency];
+    return inUSD * RATES[toCurrency];
+}
+```
+
+The build script should fetch current rates at build time (or use reasonable defaults if offline). Prices display with 2 decimal places in the target currency, using the target locale's format.
 
 ## Branding Customization
 ```bash
