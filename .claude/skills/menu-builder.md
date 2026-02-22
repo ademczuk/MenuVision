@@ -37,7 +37,7 @@ The AI agent creates these scripts:
 | `extract_menu.py` | Extract menu data from URL/PDF/photo → structured JSON |
 | `generate_images.py` | Generate food photos via Gemini Image |
 | `build_menu.py` | Build HTML menu from JSON + images (CSS/JS inline, images as relative paths) |
-| `publish_menu.py` | (Optional) Publish HTML to GitHub Pages |
+| `publish.sh` | (Optional) Publish HTML to GitHub Pages — wrapper script, always use this |
 
 ---
 
@@ -667,33 +667,33 @@ export GITHUB_REPO="menus"
 ```
 
 ### Publish
+
+**IMPORTANT: Always use the `publish.sh` wrapper script. Do NOT generate your own git/publish logic.**
+
+The wrapper script handles all NTFS bind mount permission issues, git safe.directory, PAT auth, and gallery updates. Call it with one command:
+
 ```bash
-python publish_menu.py Restaurant_Menu.html --name "Restaurant" --tagline "Cuisine · City" --cuisine Type
+bash /mnt/host/projects/TanTan_Menu_Package/publish.sh "Restaurant_Menu.html" --name "Restaurant" --tagline "Cuisine · City" --cuisine Type
 ```
+
+The script:
+1. Copies HTML + images to the menus repo using `cp` (not `shutil.copy2` — avoids NTFS `chmod` EPERM)
+2. Writes `.meta_` JSON for the gallery
+3. Updates the gallery `index.html`
+4. Runs `git -c safe.directory=* -c core.fileMode=false -c gc.auto=0` for add/commit/push
+5. Authenticates push via `GITHUB_PAT` env var
+6. Prints the public URL on success
 
 Gallery: `https://<your-username>.github.io/<repo>/`
 
-### Container Git Safety
+### Why a wrapper (not generated code)
 
-When `publish_menu.py` runs inside a Docker container with bind-mounted repos, `/home/node` is read-only — `git config --global` cannot write `~/.gitconfig`. All git commands must use the `-c` flag inline:
+Docker containers with NTFS bind-mounted repos hit three issues that make generated publish code fragile:
+- `/home/node` is read-only → `git config --global` fails silently
+- `shutil.copy2()` calls `os.chmod()` → EPERM on NTFS
+- Mixed UID ownership on `.git/objects` → git object creation fails
 
-```python
-_git_base = ["git", "-c", "safe.directory=*"]
-_git_run = lambda args: subprocess.run(
-    _git_base + args[1:] if args[0] == "git" else args,
-    cwd=str(MENUS_REPO_DIR), capture_output=True, text=True,
-)
-```
-
-**Key rules:**
-- Never use `--global` git config — filesystem may be read-only
-- Check return codes on `git add` and `git status` before proceeding — empty stdout from a failed `git status --porcelain` looks identical to "no changes" and causes false-success
-- Use PAT auth on `git pull --rebase` too, not just push — the container has no credential helper:
-```python
-if push_url:
-    _git_run(["git", "pull", "--rebase", push_url, "main"])
-```
-- `GITHUB_PAT` must be set as an environment variable accessible to the Python process (not just documented — the publish script reads it via `os.environ["GITHUB_PAT"]`)
+The wrapper script avoids all three by using `cp`, inline git `-c` flags, and PAT-authenticated push.
 
 ## EXTERNAL ENDPOINTS
 
