@@ -61,14 +61,20 @@ The core of this repo is [`.claude/skills/menu-builder.md`](.claude/skills/menu-
 - **HTML output spec** — responsive grid, selection system, allergen legend, branding
 - **Cost breakdown** — per-image and per-menu pricing
 
+## Output Modes
+
+**Portable (default)** — Generates a single self-contained HTML file with base64-embedded images. Open it locally, email it, or upload to any host. No setup beyond a Gemini API key.
+
+**GitHub Pages (optional)** — Set `GITHUB_OWNER`, `GITHUB_REPO`, and `GITHUB_PAT` to publish to your own GitHub Pages gallery. Each menu gets its own page with a shared gallery index.
+
 ## Environment Variables
 
-| Variable | Required For |
-|----------|-------------|
-| `GOOGLE_API_KEY` | Menu extraction + image generation (Gemini) |
-| `GITHUB_PAT` | Publishing to GitHub Pages |
-| `GITHUB_OWNER` | Your GitHub username |
-| `GITHUB_REPO` | Your GitHub Pages repo (default: `menus`) |
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `GOOGLE_API_KEY` | Yes | Menu extraction + image generation (Gemini) |
+| `GITHUB_PAT` | For publishing | Authenticated push to your GitHub Pages repo |
+| `GITHUB_OWNER` | For publishing | Your GitHub username |
+| `GITHUB_REPO` | For publishing | Your GitHub Pages repo name (default: `menus`) |
 
 ## Cost
 

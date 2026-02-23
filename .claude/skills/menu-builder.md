@@ -416,17 +416,34 @@ def make_placeholder_svg(code: str, name: str, secondary: str = "") -> str:
     return f"data:image/svg+xml;base64,{b64}"
 
 
-def image_tag(code: str, name: str, secondary: str, images_dir: Path) -> str:
-    """Return <img> tag — real image with lazy-load OR gradient SVG placeholder."""
+def image_tag(code: str, name: str, secondary: str, images_dir: Path, portable: bool = False) -> str:
+    """Return <img> tag — real image OR gradient SVG placeholder.
+    If portable=True, embed the real image as base64 data URI for single-file output."""
     real = find_image(code, images_dir)
     if real:
+        if portable:
+            img_path = images_dir.parent / real  # resolve relative path
+            with open(img_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            return f'<img src="data:image/jpeg;base64,{b64}" alt="{html_mod.escape(name)}">'
         return f'<img src="{html_mod.escape(real)}" alt="{html_mod.escape(name)}" loading="lazy">'
     else:
         src = make_placeholder_svg(code, name, secondary)
         return f'<img src="{src}" alt="{html_mod.escape(name)}">'
 ```
 
-**Note:** The HTML references images via relative paths (`./images/shoyu/M1.jpg`). The HTML file and `images/` directory must be deployed together. Only CSS, JS, and SVG placeholders are inline — real food photos are external files.
+### Output Modes
+
+The HTML builder supports two output modes controlled by a `--portable` flag:
+
+| Mode | Flag | Images | Output | Use Case |
+|------|------|--------|--------|----------|
+| **Portable** (default) | `--portable` or no `GITHUB_*` env vars | Base64 embedded in HTML | Single self-contained `.html` file | Open locally, email, drag-drop to any host |
+| **Deployable** | `--no-portable` or `GITHUB_*` env vars set | Relative paths (`./images/stem/code.jpg`) | HTML + `images/` directory | GitHub Pages, Netlify, any static host |
+
+**Portable mode** embeds all food images as base64 data URIs directly in the HTML. File sizes are larger (~4-6MB for an 80-item menu) but the output is a single file that works everywhere with zero hosting setup. This is the default when no `GITHUB_*` environment variables are set.
+
+**Deployable mode** uses relative image paths and requires the HTML file and `images/` directory to be hosted together. Use this when publishing to GitHub Pages or any static hosting service.
 
 ---
 
@@ -654,16 +671,36 @@ pip install playwright && playwright install chromium
 - `GITHUB_OWNER` — Your GitHub username (default: reads from git config)
 - `GITHUB_REPO` — Your GitHub Pages repo name (default: `menus`)
 
-## PUBLISHING TO GITHUB PAGES
+## PUBLISHING
 
-### Setup (one-time)
+### Default: Portable HTML (no setup)
+
+When no `GITHUB_*` environment variables are set, the pipeline generates a **self-contained HTML file** with base64-embedded images. Users can:
+- Open the file directly in any browser
+- Email it or share via any file-sharing service
+- Upload to any static host (Netlify Drop, Vercel, GitHub Pages, S3)
+
+No hosting setup, no API keys beyond `GOOGLE_API_KEY`, no git configuration needed.
+
+### Optional: GitHub Pages (requires setup)
+
+For users who want a persistent gallery with multiple menus:
+
 1. Create a GitHub repo for your menus (e.g. `your-username/menus`)
 2. Enable GitHub Pages on the `main` branch
 3. Set environment variables (must be accessible to the Python process):
 ```bash
 export GITHUB_PAT="your-personal-access-token"   # Required — used for git push auth
-export GITHUB_OWNER="your-username"
-export GITHUB_REPO="menus"
+export GITHUB_OWNER="your-username"               # Required — YOUR GitHub username
+export GITHUB_REPO="menus"                        # Optional — defaults to "menus"
+```
+
+**Important:** `publish_menu.py` MUST read `GITHUB_OWNER` and `GITHUB_REPO` from environment variables. Never hardcode a specific user's repo. The generated code should construct the repo URL dynamically:
+```python
+owner = os.environ["GITHUB_OWNER"]
+repo = os.environ.get("GITHUB_REPO", "menus")
+GITHUB_REPO = f"{owner}/{repo}"
+GITHUB_PAGES_BASE = f"https://{owner}.github.io/{repo}"
 ```
 
 ### Publish
