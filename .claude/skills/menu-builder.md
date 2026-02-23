@@ -4,7 +4,7 @@ description: "Build beautiful HTML photo menus from restaurant URLs, PDFs, or ph
 version: 1.0.0
 emoji: "🍽️"
 user-invocable: true
-metadata: {"clawdbot": {"requires": {"env": ["GOOGLE_API_KEY"], "bins": ["python3"]}, "primaryEnv": "GOOGLE_API_KEY", "homepage": "https://github.com/ademczuk/MenuVision"}}
+metadata: {"openclaw": {"requires": {"env": ["GOOGLE_API_KEY"], "bins": ["python3"]}, "primaryEnv": "GOOGLE_API_KEY", "homepage": "https://github.com/ademczuk/MenuVision"}}
 ---
 
 # MenuVision - Restaurant Menu Builder

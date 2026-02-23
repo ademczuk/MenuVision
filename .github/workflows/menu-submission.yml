@@ -1,0 +1,65 @@
+name: Process Menu Submission
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  acknowledge:
+    if: github.event.label.name == 'approved-menu'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Parse issue body
+        id: parse
+        uses: stefanbuck/github-issue-parser@v3
+        with:
+          template-path: .github/ISSUE_TEMPLATE/submit-menu.yml
+
+      - name: Validate fields
+        run: |
+          RESTAURANT="${{ steps.parse.outputs.issueparser_restaurant_name }}"
+          LOCATION="${{ steps.parse.outputs.issueparser_location }}"
+          SOURCE_TYPE="${{ steps.parse.outputs.issueparser_source_type }}"
+          SOURCE_URL="${{ steps.parse.outputs.issueparser_source_url }}"
+
+          # Basic validation - no script injection in names
+          if echo "$RESTAURANT" | grep -qiE '<script|javascript:|on(load|error|click)='; then
+            echo "::error::Restaurant name contains suspicious content"
+            exit 1
+          fi
+          if echo "$LOCATION" | grep -qiE '<script|javascript:|on(load|error|click)='; then
+            echo "::error::Location contains suspicious content"
+            exit 1
+          fi
+
+          # URL validation (if provided)
+          if [ "$SOURCE_TYPE" = "Website URL" ] && [ -z "$SOURCE_URL" ]; then
+            echo "::error::Source type is URL but no URL provided"
+            exit 1
+          fi
+
+          echo "restaurant=$RESTAURANT" >> "$GITHUB_OUTPUT"
+          echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
+          echo "source_type=$SOURCE_TYPE" >> "$GITHUB_OUTPUT"
+          echo "source_url=$SOURCE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Post acknowledgment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            **Submission approved** — processing will begin shortly.
+
+            | Field | Value |
+            |-------|-------|
+            | Restaurant | ${{ steps.parse.outputs.issueparser_restaurant_name }} |
+            | Location | ${{ steps.parse.outputs.issueparser_location }} |
+            | Source | ${{ steps.parse.outputs.issueparser_source_type }} |
+            | Cuisine | ${{ steps.parse.outputs.issueparser_cuisine }} |
+
+            A maintainer will run the MenuVision pipeline and update this issue when the menu is live.
+
+            ---
+            *This is an automated acknowledgment. The actual menu generation requires human oversight.*

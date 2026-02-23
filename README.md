@@ -7,12 +7,12 @@ Build beautiful HTML photo menus for any restaurant from URLs, PDFs, or photos. 
 </p>
 
 <p align="center">
-  <a href="https://ademczuk.github.io/menus/">Live Gallery</a> · <a href="https://clawhub.ai">ClawHub</a> · <a href=".claude/skills/menu-builder.md">Skill File</a>
+  <a href="https://ademczuk.github.io/menus/">Live Gallery</a> · <a href=".claude/skills/menu-builder.md">Skill File</a> · <a href="https://github.com/ademczuk/MenuVision/issues/new?template=submit-menu.yml">Submit a Menu</a>
 </p>
 
 ## What is this?
 
-MenuVision is an **OpenClaw / Claude Code skill** — a build specification that AI coding assistants use to create restaurant menus end-to-end. The skill file contains the full data contract, extraction prompts, and pipeline architecture so the AI agent can generate working code from scratch. Available on [ClawHub](https://clawhub.ai).
+MenuVision is an **OpenClaw / Claude Code skill** — a build specification that AI coding assistants use to create restaurant menus end-to-end. The skill file contains the full data contract, extraction prompts, and pipeline architecture so the AI agent can generate working code from scratch.
 
 1. **Extract** menu data from a website URL, PDF, or photo → structured JSON (Gemini Vision)
 2. **Generate** food photos using AI (Gemini Image)
@@ -90,10 +90,13 @@ Want to add your favorite restaurant? [Open an issue](https://github.com/ademczu
 - Restaurant name and location
 - Menu URL, PDF, or photo
 
-The pipeline processes submissions automatically. No code required — just provide the source and we handle extraction, image generation, and publishing.
+A maintainer reviews submissions and runs the pipeline. No code required from your side — just provide the source material.
 
 ## Security & Privacy
 
+- Community submissions require maintainer approval before processing (label-gated)
+- Gemini extraction uses `response_mime_type: "application/json"` — structured output only, not arbitrary text
+- HTML builder auto-escapes all content from JSON (prevents XSS from adversarial menu data)
 - Only external API used is Google Gemini (for extraction and image generation)
 - No telemetry, analytics, or tracking
 - API keys are read from environment variables, never hardcoded
