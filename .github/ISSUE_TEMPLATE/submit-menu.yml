@@ -1,0 +1,59 @@
+name: "Submit a Restaurant Menu"
+description: "Contribute a restaurant menu to the MenuVision gallery"
+title: "[Menu] "
+labels: ["menu-submission"]
+body:
+  - type: input
+    id: restaurant_name
+    attributes:
+      label: Restaurant Name
+      placeholder: "Shoyu Japanese Kitchen"
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: "City, Country"
+      placeholder: "Vienna, Austria"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source_type
+    attributes:
+      label: Menu Source
+      options:
+        - Website URL
+        - PDF (attach below)
+        - Photo (attach below)
+    validations:
+      required: true
+
+  - type: input
+    id: source_url
+    attributes:
+      label: Website URL
+      description: "Direct link to the menu page (if applicable)"
+      placeholder: "https://restaurant.com/menu"
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: PDF or Photo
+      description: "Drag and drop your menu PDF or photo here (if not using a URL)"
+
+  - type: input
+    id: cuisine
+    attributes:
+      label: Cuisine Type
+      placeholder: "Japanese, Italian, Thai, etc."
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: This is a real restaurant with a publicly available menu
+          required: true

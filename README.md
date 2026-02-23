@@ -2,6 +2,14 @@
 
 Build beautiful HTML photo menus for any restaurant from URLs, PDFs, or photos. Works with menus in any language.
 
+<p align="center">
+  <img src="docs/menuvision_demo.gif" alt="MenuVision Demo" width="720">
+</p>
+
+<p align="center">
+  <a href="https://ademczuk.github.io/menus/">Live Gallery</a> · <a href="https://clawhub.ai">ClawHub</a> · <a href=".claude/skills/menu-builder.md">Skill File</a>
+</p>
+
 ## What is this?
 
 MenuVision is an **OpenClaw / Claude Code skill** — a build specification that AI coding assistants use to create restaurant menus end-to-end. The skill file contains the full data contract, extraction prompts, and pipeline architecture so the AI agent can generate working code from scratch. Available on [ClawHub](https://clawhub.ai).
@@ -69,6 +77,20 @@ The core of this repo is [`.claude/skills/menu-builder.md`](.claude/skills/menu-
 | Per image (Gemini) | $0.039 |
 | 80-item menu | ~$3.12 |
 | Time (80 items) | ~8 min |
+
+## Live Gallery
+
+Browse generated menus at **[ademczuk.github.io/menus](https://ademczuk.github.io/menus/)**
+
+Currently featuring: Shoyu (Japanese, 80 dishes), Odysseus (Greek, 61 dishes), TanTan (Chinese, 75 dishes), Maxingstuberl (Austrian, 33 dishes), and more.
+
+## Contribute a Menu
+
+Want to add your favorite restaurant? [Open an issue](https://github.com/ademczuk/MenuVision/issues/new?template=submit-menu.yml) with:
+- Restaurant name and location
+- Menu URL, PDF, or photo
+
+The pipeline processes submissions automatically. No code required — just provide the source and we handle extraction, image generation, and publishing.
 
 ## Security & Privacy
 
